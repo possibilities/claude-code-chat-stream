@@ -1,6 +1,6 @@
 import { Command } from 'commander'
 import packageJson from '../package.json' assert { type: 'json' }
-import { existsSync, readdirSync } from 'fs'
+import { existsSync, watch, readFileSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 
@@ -8,22 +8,6 @@ function slugifyPath(absolutePath: string): string {
   return absolutePath.startsWith('/')
     ? `-${absolutePath.slice(1).replace(/[/.]/g, '-')}`
     : absolutePath.replace(/[/.]/g, '-')
-}
-
-function countFilesRecursively(dirPath: string): number {
-  let fileCount = 0
-  const entries = readdirSync(dirPath, { withFileTypes: true })
-
-  for (const entry of entries) {
-    const fullPath = join(dirPath, entry.name)
-    if (entry.isDirectory()) {
-      fileCount += countFilesRecursively(fullPath)
-    } else if (entry.isFile()) {
-      fileCount++
-    }
-  }
-
-  return fileCount
 }
 
 async function main() {
@@ -47,9 +31,56 @@ async function main() {
         process.exit(1)
       }
 
-      const fileCount = countFilesRecursively(projectPath)
-      console.log(`Found project: ${slugifiedName}`)
-      console.log(`Number of files: ${fileCount}`)
+      console.log(`Found project: ${projectPath}`)
+      console.log('Watching for new files...')
+
+      let linesPrinted = 0
+      let fileWatcher: ReturnType<typeof watch> | null = null
+
+      const watcher = watch(
+        projectPath,
+        { recursive: false },
+        (eventType, filename) => {
+          if (
+            eventType === 'rename' &&
+            filename &&
+            filename.endsWith('.jsonl')
+          ) {
+            console.log(`New file detected: ${filename}`)
+            watcher.close()
+
+            const filePath = join(projectPath, filename)
+
+            const processFile = () => {
+              try {
+                const content = readFileSync(filePath, 'utf-8')
+                const lines = content.split('\n').filter(line => line.trim())
+
+                for (let i = linesPrinted; i < lines.length; i++) {
+                  console.log(lines[i])
+                }
+
+                linesPrinted = lines.length
+              } catch (error) {}
+            }
+
+            processFile()
+
+            fileWatcher = watch(filePath, eventType => {
+              if (eventType === 'change') {
+                processFile()
+              }
+            })
+          }
+        },
+      )
+
+      process.on('SIGINT', () => {
+        console.log('\nStopping watchers...')
+        watcher.close()
+        if (fileWatcher) fileWatcher.close()
+        process.exit(0)
+      })
     })
 
   try {
