@@ -31,8 +31,8 @@ async function main() {
         process.exit(1)
       }
 
-      console.log(`Found project: ${projectPath}`)
-      console.log('Watching for new files...')
+      console.error(`Found project: ${projectPath}`)
+      console.error('Watching for new files...')
 
       let linesPrinted = 0
       let fileWatcher: ReturnType<typeof watch> | null = null
@@ -46,7 +46,7 @@ async function main() {
             filename &&
             filename.endsWith('.jsonl')
           ) {
-            console.log(`New file detected: ${filename}`)
+            console.error(`New file detected: ${filename}`)
             watcher.close()
 
             const filePath = join(projectPath, filename)
@@ -76,7 +76,7 @@ async function main() {
       )
 
       process.on('SIGINT', () => {
-        console.log('\nStopping watchers...')
+        console.error('\nStopping watchers...')
         watcher.close()
         if (fileWatcher) fileWatcher.close()
         process.exit(0)
