@@ -154,7 +154,20 @@ async function main() {
 
             for (let i = lastPrinted; i < lines.length; i++) {
               const jsonLine = lines[i]
-              console.log(jsonLine)
+
+              try {
+                JSON.parse(jsonLine)
+                console.log(jsonLine)
+              } catch (error) {
+                console.error(
+                  `\nError: Invalid JSON detected at line ${i + 1} in file ${filename}`,
+                )
+                console.error(`Invalid line content: ${jsonLine}`)
+                console.error(
+                  `Parse error: ${error instanceof Error ? error.message : String(error)}`,
+                )
+                process.exit(1)
+              }
 
               if (options.toDb && db && sqlite) {
                 const id = ulid()
