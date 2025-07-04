@@ -81,17 +81,26 @@ async function main() {
     .name('claude-code-chat-stream')
     .description('CLI for Claude Code chat streaming')
     .version(packageJson.version)
-    .argument('<database>', 'SQLite database path')
-    .action(async (database: string) => {
+    .option(
+      '--to-db <database-path>',
+      'SQLite database path for storing entries',
+    )
+    .action(async (options: { toDb?: string }) => {
       const processStartTime = Date.now()
       const currentDirectory = process.cwd()
       const slugifiedName = slugifyPath(currentDirectory)
       const claudeProjectsPath = join(homedir(), '.claude', 'projects')
       const projectPath = join(claudeProjectsPath, slugifiedName)
 
-      const { db, sqlite } = initializeDatabase(database)
+      let db: any = null
+      let sqlite: any = null
 
-      console.error(`Database: ${resolve(database)}`)
+      if (options.toDb) {
+        const dbResult = initializeDatabase(options.toDb)
+        db = dbResult.db
+        sqlite = dbResult.sqlite
+        console.error(`Database: ${resolve(options.toDb)}`)
+      }
 
       const fileWatchers = new Map<string, ReturnType<typeof watch>>()
       const linesPrintedPerFile = new Map<string, number>()
@@ -147,41 +156,45 @@ async function main() {
               const jsonLine = lines[i]
               console.log(jsonLine)
 
-              const id = ulid()
-              const maxRetries = 5
-              let retryCount = 0
-              let success = false
+              if (options.toDb && db && sqlite) {
+                const id = ulid()
+                const maxRetries = 5
+                let retryCount = 0
+                let success = false
 
-              while (retryCount < maxRetries && !success) {
-                try {
-                  sqlite.prepare('BEGIN IMMEDIATE').run()
+                while (retryCount < maxRetries && !success) {
+                  try {
+                    sqlite.prepare('BEGIN IMMEDIATE').run()
 
-                  await db.insert(entries).values({
-                    id,
-                    data: jsonLine,
-                    cwd: currentDirectory,
-                    filepath: filePath,
-                    created: new Date(),
-                  })
+                    await db.insert(entries).values({
+                      id,
+                      data: jsonLine,
+                      cwd: currentDirectory,
+                      filepath: filePath,
+                      created: new Date(),
+                    })
 
-                  sqlite.prepare('COMMIT').run()
-                  success = true
-                } catch (error: any) {
-                  sqlite.prepare('ROLLBACK').run()
+                    sqlite.prepare('COMMIT').run()
+                    success = true
+                  } catch (error: any) {
+                    sqlite.prepare('ROLLBACK').run()
 
-                  if (
-                    error.code === 'SQLITE_BUSY' &&
-                    retryCount < maxRetries - 1
-                  ) {
-                    retryCount++
-                    const waitTime = Math.min(
-                      100 * Math.pow(2, retryCount),
-                      1000,
-                    )
-                    await new Promise(resolve => setTimeout(resolve, waitTime))
-                  } else {
-                    console.error(`Failed to store line: ${error.message}`)
-                    break
+                    if (
+                      error.code === 'SQLITE_BUSY' &&
+                      retryCount < maxRetries - 1
+                    ) {
+                      retryCount++
+                      const waitTime = Math.min(
+                        100 * Math.pow(2, retryCount),
+                        1000,
+                      )
+                      await new Promise(resolve =>
+                        setTimeout(resolve, waitTime),
+                      )
+                    } else {
+                      console.error(`Failed to store line: ${error.message}`)
+                      break
+                    }
                   }
                 }
               }
@@ -225,7 +238,7 @@ async function main() {
         console.error('\nStopping watchers...')
         if (projectWatcher) projectWatcher.close()
         fileWatchers.forEach(fw => fw.close())
-        sqlite.close()
+        if (sqlite) sqlite.close()
         process.exit(0)
       })
     })
