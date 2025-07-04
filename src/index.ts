@@ -78,7 +78,7 @@ async function main() {
   const program = new Command()
 
   program
-    .name('claude-chat-stream')
+    .name('claude-code-chat-stream')
     .description('CLI for Claude Code chat streaming')
     .version(packageJson.version)
     .argument('<database>', 'SQLite database path')
