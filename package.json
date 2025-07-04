@@ -16,7 +16,11 @@
     "typecheck:watch": "tsc --noEmit --watch",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "release": "./release.sh",
+    "release:patch": "./release.sh patch",
+    "release:minor": "./release.sh minor",
+    "release:major": "./release.sh major"
   },
   "dependencies": {
     "better-sqlite3": "^12.2.0",
