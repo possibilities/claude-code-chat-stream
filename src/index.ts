@@ -61,7 +61,10 @@ function initializeDatabase(dbPath: string) {
         .get(hash)
 
       if (!existing) {
-        sqlite.prepare(sql).run()
+        const statements = sql.split(';').filter(stmt => stmt.trim())
+        for (const statement of statements) {
+          sqlite.prepare(statement).run()
+        }
         sqlite
           .prepare(
             'INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)',
