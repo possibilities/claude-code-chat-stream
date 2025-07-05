@@ -18,13 +18,16 @@ export const migrations = {
 \t\`data\` text NOT NULL,
 \t\`cwd\` text NOT NULL,
 \t\`filepath\` text NOT NULL,
-\t\`created\` integer DEFAULT (unixepoch()) NOT NULL
+\t\`created\` integer DEFAULT (unixepoch()) NOT NULL,
+\t\`session_id\` text GENERATED ALWAYS AS (json_extract(data, '$.sessionId')) STORED
 );
 
 CREATE INDEX idx_entries_cwd ON entries(cwd);
 CREATE INDEX idx_entries_created ON entries(created);
 CREATE INDEX idx_entries_filepath ON entries(filepath);
 CREATE INDEX idx_entries_cwd_created ON entries(cwd, created);
-CREATE INDEX idx_entries_session_id ON entries(json_extract(data, '$.sessionId'));`,
+CREATE INDEX idx_entries_session_id ON entries(session_id);
+CREATE INDEX idx_entries_cwd_session_id ON entries(cwd, session_id);
+CREATE INDEX idx_entries_cwd_session_created ON entries(cwd, session_id, created);`,
   },
 }
