@@ -84,11 +84,18 @@ async function main() {
     .name('claude-code-chat-stream')
     .description('CLI for Claude Code chat streaming')
     .version(packageJson.version)
-    .option(
-      '--to-db <database-path>',
-      'SQLite database path for storing entries',
-    )
-    .action(async (options: { toDb?: string }) => {
+    .option('--to-db <db-path>', 'SQLite database path for storing entries')
+    .action(async (options: { toDb?: string }, command: Command) => {
+      const args = command.args
+      if (args && args.length > 0) {
+        console.error(
+          `Error: Unexpected positional argument(s): ${args.join(' ')}`,
+        )
+        console.error(
+          'Use --to-[destination] CLI flag to specify stream destination.',
+        )
+        process.exit(1)
+      }
       const processStartTime = Date.now()
       const currentDirectory = process.cwd()
       const slugifiedName = slugifyPath(currentDirectory)
