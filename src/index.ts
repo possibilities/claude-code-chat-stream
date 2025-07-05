@@ -15,6 +15,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { ulid } from 'ulid'
 import { entries } from './db/schema.js'
 import { migrations } from './db/migrations.js'
+import { exec } from 'child_process'
 
 function slugifyPath(absolutePath: string): string {
   return absolutePath.startsWith('/')
@@ -163,23 +164,40 @@ async function main() {
             const lastPrinted = linesPrintedPerFile.get(filename) || 0
 
             for (let i = lastPrinted; i < lines.length; i++) {
-              const jsonLine = lines[i]
+              let jsonLine = lines[i]
 
-              try {
-                JSON.parse(jsonLine)
-                console.log(jsonLine)
-              } catch (error) {
-                console.error(
-                  `\nError: Invalid JSON detected at line ${i + 1} in file ${filename}`,
-                )
-                console.error(`Invalid line content: ${jsonLine}`)
-                console.error(
-                  `Parse error: ${error instanceof Error ? error.message : String(error)}`,
-                )
-                process.exit(1)
+              const maxRetryTime = 150
+              const retryDelay = 50
+              const startTime = Date.now()
+              let parsed = null
+
+              while (Date.now() - startTime < maxRetryTime) {
+                try {
+                  parsed = JSON.parse(jsonLine)
+                  break
+                } catch (error) {
+                  await new Promise(resolve => setTimeout(resolve, retryDelay))
+                  const newContent = readFileSync(filePath, 'utf-8')
+                  const newLines = newContent
+                    .split('\n')
+                    .filter(line => line.trim())
+                  if (newLines[i]) {
+                    jsonLine = newLines[i]
+                  }
+                }
               }
 
-              if (options.toDb && db && sqlite) {
+              if (parsed) {
+                console.log(jsonLine)
+              } else {
+                if (process.env.DEBUG_INVALID_JSON === '1') {
+                  exec(
+                    `notify-send "Invalid JSON in ${slugifiedName}" "CWD: ${currentDirectory}\\nFile: ${filename}\\nLine: ${i + 1}\\nFailed after ${maxRetryTime}ms"`,
+                  )
+                }
+              }
+
+              if (parsed && options.toDb && db && sqlite) {
                 const id = ulid()
                 const maxRetries = 5
                 let retryCount = 0
